@@ -1,12 +1,30 @@
 var Resource = require("./resource.js");
 var Message = require("./resource.js").Message;
 var Table = require("./table.js");
+var Tournament = require("./tournament.js");
 
-var Holdem = function() {
+var Status = {
+	UNINITED: "uninited",
+	SEATING: "seating",
+	GAMING: "gaming",
+	FINISHED: "finished"
+};
+
+var Holdem = function(shutdownCallback) {
+	this.status = Status.UNINITED;
 	this.table = null;
+	this.tournament = null;
+	this.shutdownCallback = shutdownCallback;
+	this.messageFunc = function(msg) { console.log(msg); };
 };
 Holdem.prototype.message = function(msg) {
-	console.log(msg);
+	for(var i = 1; i < arguments.length; i++) {
+		msg = msg.replace("%" + i, arguments[i]);
+	}
+	this.messageFunc(msg);
+};
+Holdem.prototype.setMessageFunc = function(msgFunc) {
+	this.messageFunc = msgFunc;
 };
 Holdem.prototype.info = function(msg) {
 	this.message("INFO: " + msg);
@@ -15,9 +33,7 @@ Holdem.prototype.error = function(msg) {
 	this.message("ERROR: " + msg);
 };
 Holdem.prototype.confirm = function(sender, commandLine, msg) {
-	if(this.currentConfirm) {
-		this.cancelConfirm();
-	}
+	this.cancelConfirm();
 
 	this.message(Message.CONFIRM_PREFIX + msg + Message.CONFIRM_POSTFIX);
 	this.currentConfirm = {sender: sender, commandLine: commandLine};
@@ -34,11 +50,14 @@ Holdem.prototype.answerConfirm = function(sender, answer) {
 	}
 };
 Holdem.prototype.cancelConfirm = function() {
-	this.message(Message.CONFIRM_CANCELED + this.currentConfirm.sender + " " + this.currentConfirm.commandLine);
-	this.currentConfirm = null;
+	if(this.currentConfirm) {
+		this.message(Message.CONFIRM_CANCELED + this.currentConfirm.sender + " " + this.currentConfirm.commandLine);
+		this.currentConfirm = null;
+	}
 };
 
 Holdem.prototype.command = function(sender, commandLine, force) {
+	// console.log("[" + sender + ":" + commandLine + "]");
 	var commandArgs = commandLine.split(" ");
 	var command = commandArgs.shift().toLowerCase();
 	command = command.split("-").join(""); // remove "-" like "all-in"
@@ -56,26 +75,51 @@ Holdem.prototype.command = function(sender, commandLine, force) {
 			if(!force) {
 				this.confirm(sender, commandLine, Message.CONFIRM_SHUTDOWN);
 			} else {
-				this.error("shutdown not implemented");
+				this.shutdownCallback && this.shutdownCallback();
+			}
+			break;
+		case "join":
+			if(this.status == Status.SEATING) {
+				var ret = this.table.join(sender);
+				if(ret.result) {
+					this.message(Message.JOINED_SUCCESSFULLY, sender, Resource.Config.MaxPlayer - ret.playerCount);
+					if(ret.playerCount == Resource.Config.MaxPlayer) {
+						// sealed and start
+						this.command(null, "start", true);
+					}
+				} else {
+					this.message(ret.reason, sender);
+				}
+			}
+			break;
+		case "start":
+			if(this.status == Status.SEATING) {
+				if(this.table.getPlayerCount() < 2) {
+					this.message(Message.NOT_ENOUGH_PLAYER);
+				} else {
+					if(!force) {
+						this.confirm(sender, commandLine, Message.CONFIRM_START);
+					} else {
+						this.table.seal();
+						this.message(Message.START_GAME, this.table.getPlayerCount());
+						this.status = Status.GAMING;
+					}
+				}
 			}
 			break;
 	}
 };
 
 Holdem.prototype.init = function(max, prizeList) {
-	if(this.table) {
-		this.error(Message.TABLE_ALREADY_INITIALIZED);
+	if(this.status != Status.UNINITED) {
+		this.error(Message.ALREADY_INITIALIZED);
 		return;
 	}
 	var table = new Table();
+	this.tournament = new Tournament();
 	this.table = table;
+	this.status = Status.SEATING;
+	this.message(Message.INITIALIZED, Resource.Config.MaxPlayer);
 };
 
 module.exports = Holdem;
-
-var test = new Holdem();
-test.command("root", "init");
-test.command("root", "shutdown");
-test.command("root", "shutdown");
-test.command("root", "yes");
-
