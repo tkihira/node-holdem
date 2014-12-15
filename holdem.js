@@ -1,6 +1,5 @@
 var Resource = require("./resource.js");
 var Message = require("./resource.js").Message;
-var Table = require("./table.js");
 var Tournament = require("./tournament.js");
 
 var Status = {
@@ -12,7 +11,6 @@ var Status = {
 
 var Holdem = function(shutdownCallback) {
 	this.status = Status.UNINITED;
-	this.table = null;
 	this.tournament = null;
 	this.shutdownCallback = shutdownCallback;
 	this.messageFunc = function(msg) { console.log(msg); };
@@ -80,10 +78,10 @@ Holdem.prototype.command = function(sender, commandLine, force) {
 			break;
 		case "join":
 			if(this.status == Status.SEATING) {
-				var ret = this.table.join(sender);
+				var ret = this.tournament.join(sender);
 				if(ret.result) {
-					this.message(Message.JOINED_SUCCESSFULLY, sender, Resource.Config.MaxPlayer - ret.playerCount);
-					if(ret.playerCount == Resource.Config.MaxPlayer) {
+					this.message(Message.JOINED_SUCCESSFULLY, sender, Resource.Config.maxPlayer - ret.playerCount);
+					if(ret.playerCount == Resource.Config.maxPlayer) {
 						// sealed and start
 						this.command(null, "start", true);
 					}
@@ -94,17 +92,28 @@ Holdem.prototype.command = function(sender, commandLine, force) {
 			break;
 		case "start":
 			if(this.status == Status.SEATING) {
-				if(this.table.getPlayerCount() < 2) {
+				if(this.tournament.getPlayerCount() < 2) {
 					this.message(Message.NOT_ENOUGH_PLAYER);
 				} else {
 					if(!force) {
 						this.confirm(sender, commandLine, Message.CONFIRM_START);
 					} else {
-						this.table.seal();
-						this.message(Message.START_GAME, this.table.getPlayerCount());
+						this.tournament.seal();
+						this.message(Message.START_GAME, this.tournament.getPlayerCount(), "$" + Resource.Config.buyin.toFixed(2));
 						this.status = Status.GAMING;
+						this.tournament.init();
+						this.command(null, "info");
 					}
 				}
+			}
+			break;
+		case "info":
+			if(this.status == Status.GAMING) {
+				var prize = "";
+				this.tournament.prizeStructure.forEach(function(e) {
+					prize += "$" + e.toFixed(2) + " ";
+				});
+				this.message(Message.TOURNAMENT_INFO, this.tournament.getPlayerCount(), this.tournament.blindLevel, this.tournament.prizeStructure.length, prize);
 			}
 			break;
 	}
@@ -115,11 +124,9 @@ Holdem.prototype.init = function(max, prizeList) {
 		this.error(Message.ALREADY_INITIALIZED);
 		return;
 	}
-	var table = new Table();
 	this.tournament = new Tournament();
-	this.table = table;
 	this.status = Status.SEATING;
-	this.message(Message.INITIALIZED, Resource.Config.MaxPlayer);
+	this.message(Message.INITIALIZED, Resource.Config.maxPlayer);
 };
 
 module.exports = Holdem;
