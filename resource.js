@@ -3,6 +3,8 @@ var Resource = {
 		maxPlayer: 10,
 		buyin: 100, // $100
 		blindLevel: 5, // every 5 minutes
+		cardSuits: ["s", "h", "d", "c"],
+		cardNumbers: ["A", "2", "3", "4", "5", "6", "7", "8", "9", "T", "J", "Q", "K"],
 	},
 	Message: {
 		ALREADY_INITIALIZED: "既に初期化されています",
@@ -19,6 +21,9 @@ var Resource = {
 		CONFIRM_START: "ゲームを開始してよろしいですか？",
 		START_GAME: "ゲームを開始します。参加者は%1名、バイインは%2です",
 		TOURNAMENT_INFO: "参加者%1名、ブラインド間隔%2分、賞金額は上位%3名に上から %4です",
+		HAND_INFO: "#%1 Hand: Big Blind %2さん%4、Small Blind %3さんです",
+		HAND_INFO_WITH_ANTI: "#%1 Hand: Big Blind %2さん%4、Small Blind %3さん%5、Anti %6です",
+		POCKET_INFO: "#%1Hand: [%2][%3]",
 	},
 	BlindStructure: {
 		regular: [

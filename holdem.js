@@ -100,8 +100,9 @@ Holdem.prototype.command = function(sender, commandLine, force) {
 					} else {
 						this.tournament.seal();
 						this.message(Message.START_GAME, this.tournament.getPlayerCount(), "$" + Resource.Config.buyin.toFixed(2));
-						this.status = Status.GAMING;
 						this.tournament.init();
+						// start gaming
+						this.status = Status.GAMING;
 						this.command(null, "info");
 					}
 				}
